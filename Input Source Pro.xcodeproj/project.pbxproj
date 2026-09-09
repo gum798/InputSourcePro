@@ -181,6 +181,8 @@
 		D60002222F20000000000222 /* SpotlightIndicatorPosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */; };
 		D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */; };
 		D60001022F20000000000102 /* AppKindComparisonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60001012F20000000000101 /* AppKindComparisonTests.swift */; };
+		D60003022F20000000000302 /* ShortcutConflict.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003012F20000000000301 /* ShortcutConflict.swift */; };
+		D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60003032F20000000000303 /* ShortcutConflictTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -378,6 +380,8 @@
 		D60002212F20000000000221 /* SpotlightIndicatorPosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPosition.swift; sourceTree = "<group>"; };
 		D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotlightIndicatorPositionTests.swift; sourceTree = "<group>"; };
 		D60001012F20000000000101 /* AppKindComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKindComparisonTests.swift; sourceTree = "<group>"; };
+		D60003012F20000000000301 /* ShortcutConflict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflict.swift; sourceTree = "<group>"; };
+		D60003032F20000000000303 /* ShortcutConflictTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConflictTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -510,6 +514,7 @@
 				4AEEE08328126A4900C883F8 /* BrowserURL.swift */,
 				D58C184728A808F000F52845 /* KeyboardRestoreStrategy.swift */,
 				B18B53A0848947E3A2D4EFA8 /* ShortcutTrigger.swift */,
+				D60003012F20000000000301 /* ShortcutConflict.swift */,
 				4A8E49902F0AF69200424D11 /* FKeyManager.swift */,
 				4A8E47682F08814500424D11 /* SwiftUI+FlexibleButtonSizing.swift */,
 			);
@@ -762,6 +767,7 @@
 				D60002112F20000000000211 /* AlwaysNearMousePlacementTests.swift */,
 				D60002412F20000000000241 /* SpotlightCompatibilityTests.swift */,
 				D60002312F20000000000231 /* SpotlightIndicatorPositionTests.swift */,
+				D60003032F20000000000303 /* ShortcutConflictTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -975,6 +981,7 @@
 				4A20AD6328926DFA00620D14 /* NavigationVM.swift in Sources */,
 				D58C184828A808F000F52845 /* KeyboardRestoreStrategy.swift in Sources */,
 				3D25B151766744F888171177 /* ShortcutTrigger.swift in Sources */,
+				D60003022F20000000000302 /* ShortcutConflict.swift in Sources */,
 				D52E2C57293D31E00017CB7E /* FocusAwareTextField.swift in Sources */,
 				4A881A91288BC50B00B76498 /* KeyboardConfig.swift in Sources */,
 				4A093071285DACAA00232089 /* NSToggleView.swift in Sources */,
@@ -1086,6 +1093,7 @@
 				D60002122F20000000000212 /* AlwaysNearMousePlacementTests.swift in Sources */,
 				D60002422F20000000000242 /* SpotlightCompatibilityTests.swift in Sources */,
 				D60002322F20000000000232 /* SpotlightIndicatorPositionTests.swift in Sources */,
+				D60003042F20000000000304 /* ShortcutConflictTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -226,6 +226,7 @@
 "Open Input Monitoring Settings" = "入力監視設定を開く";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "入力監視設定を開き、「+」ボタンをクリックして一覧に「Input Source Pro」を追加してください。";
 "Disabled until permissions are granted" = "権限が付与されるまで無効";
+"Conflicts with the %@ shortcut" = "%@のショートカット設定と競合しています";
 
 "Settings Backup" = "設定バックアップ";
 "Export Settings" = "設定を書き出す";

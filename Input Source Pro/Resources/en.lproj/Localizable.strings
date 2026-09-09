@@ -226,6 +226,7 @@
 "Open Input Monitoring Settings" = "Open Input Monitoring Settings";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list.";
 "Disabled until permissions are granted" = "Disabled until permissions are granted";
+"Conflicts with the %@ shortcut" = "Conflicts with the %@ shortcut";
 
 "Settings Backup" = "Settings Backup";
 "Export Settings" = "Export Settings";

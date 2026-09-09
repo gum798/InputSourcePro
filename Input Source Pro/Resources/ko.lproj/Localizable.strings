@@ -226,6 +226,7 @@
 "Open Input Monitoring Settings" = "입력 모니터링 설정 열기";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "입력 모니터링 설정을 열고 \"+\" 버튼을 클릭한 다음 목록에 \"Input Source Pro\"를 추가하세요.";
 "Disabled until permissions are granted" = "권한이 허용될 때까지 비활성화됨";
+"Conflicts with the %@ shortcut" = "%@ 단축키 설정과 충돌합니다";
 
 "Settings Backup" = "설정 백업";
 "Export Settings" = "설정 내보내기";

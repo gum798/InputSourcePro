@@ -158,7 +158,6 @@ struct KeyboardsSettingsView: View {
                 Spacer()
 
                 shortcutControls(
-                    mode: preferencesVM.functionKeysToggleMode(),
                     modeBinding: functionKeysToggleModeBinding(),
                     triggerBinding: functionKeysToggleTriggerBinding(),
                     modifierSelection: preferencesVM.functionKeysToggleCombo(),
@@ -187,7 +186,6 @@ struct KeyboardsSettingsView: View {
                     Spacer()
 
                     shortcutControls(
-                        mode: preferencesVM.shortcutMode(for: inputSource),
                         modeBinding: shortcutModeBinding(for: inputSource),
                         triggerBinding: singleModifierTriggerBinding(for: inputSource),
                         modifierSelection: preferencesVM.modifierCombo(for: inputSource),
@@ -223,7 +221,6 @@ struct KeyboardsSettingsView: View {
                     if let groupId = group.id {
                         VStack(alignment: .trailing, spacing: 8) {
                             shortcutControls(
-                                mode: preferencesVM.shortcutMode(for: group),
                                 modeBinding: shortcutModeBinding(for: group),
                                 triggerBinding: singleModifierTriggerBinding(for: group),
                                 modifierSelection: preferencesVM.modifierCombo(for: group),
@@ -255,18 +252,6 @@ struct KeyboardsSettingsView: View {
             }
             .padding(.bottom)
         }
-    }
-
-    func modifierComboPicker(
-        selection: ModifierCombo?,
-        onSelect: @escaping (ModifierCombo?) -> Void
-    ) -> some View {
-        ModifierComboPicker(
-            selection: Binding(
-                get: { selection },
-                set: { onSelect($0) }
-            )
-        )
     }
 
     func shortcutModeBinding(for inputSource: InputSource) -> Binding<ShortcutTriggerMode> {
@@ -331,13 +316,54 @@ struct KeyboardsSettingsView: View {
 
     @ViewBuilder
     func shortcutControls(
-        mode: ShortcutTriggerMode,
         modeBinding: Binding<ShortcutTriggerMode>,
         triggerBinding: Binding<SingleModifierTrigger>,
         modifierSelection: ModifierCombo?,
         onModifierSelect: @escaping (ModifierCombo?) -> Void,
         recorderId: String
     ) -> some View {
+        ShortcutControlsRow(
+            mode: modeBinding,
+            trigger: triggerBinding,
+            modifierSelection: modifierSelection,
+            onModifierSelect: onModifierSelect,
+            recorderId: recorderId,
+            groups: Array(hotKeyGroups),
+            needsAccessibilityPermission: needsAccessibilityPermission,
+            needsInputMonitoringPermission: needsInputMonitoringPermission,
+            shortcutControlColumns: shortcutControlColumns
+        )
+        .id(recorderId)
+    }
+
+    func deleteGroup(group: HotKeyGroup) {
+        if let id = group.id, !id.isEmpty {
+            KeyboardShortcuts.reset([.init(id)])
+        }
+        preferencesVM.deleteHotKeyGroup(group)
+        indicatorVM.refreshShortcut()
+    }
+}
+
+private struct ShortcutControlsRow: View {
+    @EnvironmentObject var indicatorVM: IndicatorVM
+    @EnvironmentObject var preferencesVM: PreferencesVM
+
+    @Binding var mode: ShortcutTriggerMode
+    @Binding var trigger: SingleModifierTrigger
+    let modifierSelection: ModifierCombo?
+    let onModifierSelect: (ModifierCombo?) -> Void
+    let recorderId: String
+    let groups: [HotKeyGroup]
+    let needsAccessibilityPermission: Bool
+    let needsInputMonitoringPermission: Bool
+    let shortcutControlColumns: [GridItem]
+
+    @State private var lastAcceptedKeyboardShortcut: KeyboardShortcuts.Shortcut?
+    @State private var lastAcceptedModifierCombo: ModifierCombo?
+    @State private var conflictOwnerName: String?
+
+    var body: some View {
         let isComboSelection = (modifierSelection?.keys.count ?? 0) > 1
         let triggerOptions = isComboSelection
             ? [SingleModifierTrigger.singlePress]
@@ -346,7 +372,7 @@ struct KeyboardsSettingsView: View {
         VStack(alignment: .trailing, spacing: 8) {
             LazyVGrid(columns: shortcutControlColumns, alignment: .trailing, spacing: 6) {
                 Text("Shortcut Type".i18n())
-                Picker("Shortcut Type".i18n(), selection: modeBinding) {
+                Picker("Shortcut Type".i18n(), selection: $mode) {
                     ForEach(ShortcutTriggerMode.allCases) { option in
                         Text(option.name).tag(option)
                     }
@@ -356,19 +382,19 @@ struct KeyboardsSettingsView: View {
 
                 if mode == .keyboardShortcut {
                     Text("Shortcut".i18n())
-                    KeyboardShortcuts.Recorder(for: .init(recorderId), onChange: { _ in
-                        indicatorVM.refreshShortcut()
-                    })
+                    LiveShortcutRecorder(name: .init(recorderId), onChange: handleKeyboardShortcutChange)
                 } else {
                     Text("Shortcut".i18n())
-                    modifierComboPicker(
-                        selection: modifierSelection,
-                        onSelect: onModifierSelect
+                    ModifierComboPicker(
+                        selection: Binding(
+                            get: { modifierSelection },
+                            set: { handleModifierSelect($0) }
+                        )
                     )
                     .flexibleButtonSizing()
 
                     Text("Trigger".i18n())
-                    Picker("Trigger".i18n(), selection: triggerBinding) {
+                    Picker("Trigger".i18n(), selection: $trigger) {
                         ForEach(triggerOptions) { option in
                             Text(option.name).tag(option)
                         }
@@ -378,25 +404,111 @@ struct KeyboardsSettingsView: View {
                     .disabled(isComboSelection)
                 }
             }
-            
-            // Show warning outside the grid so it spans full width
+
+            if let conflictOwnerName {
+                Text(ShortcutConflict.message(with: conflictOwnerName))
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.trailing)
+            }
+
             if mode == .singleModifier && modifierSelection != nil && (needsAccessibilityPermission || needsInputMonitoringPermission) {
                 Text("Disabled until permissions are granted".i18n())
-                                        .foregroundColor(.orange)
+                    .foregroundColor(.orange)
             }
         }
+        .onAppear {
+            lastAcceptedKeyboardShortcut = KeyboardShortcuts.getShortcut(for: .init(recorderId))
+            lastAcceptedModifierCombo = modifierSelection
+        }
+        .onChange(of: mode) { _ in
+            conflictOwnerName = nil
+        }
         .onChange(of: modifierSelection?.keys.count ?? 0) { newCount in
-            if newCount > 1 && triggerBinding.wrappedValue != .singlePress {
-                triggerBinding.wrappedValue = .singlePress
+            if newCount > 1 && trigger != .singlePress {
+                trigger = .singlePress
             }
         }
     }
 
-    func deleteGroup(group: HotKeyGroup) {
-        if let id = group.id, !id.isEmpty {
-            KeyboardShortcuts.reset([.init(id)])
+    private func handleKeyboardShortcutChange(_ shortcut: KeyboardShortcuts.Shortcut?) {
+        let assignments = ShortcutConflict.keyboardAssignments(
+            preferencesVM: preferencesVM,
+            groups: groups
+        )
+        let decision = ShortcutConflict.resolve(
+            proposed: shortcut,
+            currentId: recorderId,
+            lastAccepted: lastAcceptedKeyboardShortcut,
+            assignments: assignments
+        )
+
+        ShortcutConflict.persistKeyboardShortcut(
+            proposed: shortcut,
+            currentId: recorderId,
+            decision: decision,
+            assignments: assignments
+        )
+
+        if let ownerName = decision.conflictOwnerName {
+            conflictOwnerName = ownerName
+        } else {
+            conflictOwnerName = nil
+            lastAcceptedKeyboardShortcut = decision.accepted
         }
-        preferencesVM.deleteHotKeyGroup(group)
+
         indicatorVM.refreshShortcut()
+    }
+
+    private func handleModifierSelect(_ selection: ModifierCombo?) {
+        let decision = ShortcutConflict.resolve(
+            proposed: selection,
+            currentId: recorderId,
+            lastAccepted: lastAcceptedModifierCombo,
+            assignments: ShortcutConflict.modifierAssignments(
+                preferencesVM: preferencesVM,
+                groups: groups
+            )
+        )
+
+        if let ownerName = decision.conflictOwnerName {
+            conflictOwnerName = ownerName
+            return
+        }
+
+        conflictOwnerName = nil
+        lastAcceptedModifierCombo = decision.accepted
+        onModifierSelect(decision.accepted)
+    }
+}
+
+/// `KeyboardShortcuts.Recorder` only stores `onChange` in `makeNSView`.
+/// Keep the callback on a class so later recordings see current assignments.
+private struct LiveShortcutRecorder: NSViewRepresentable {
+    let name: KeyboardShortcuts.Name
+    let onChange: (KeyboardShortcuts.Shortcut?) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onChange: onChange)
+    }
+
+    func makeNSView(context: Context) -> KeyboardShortcuts.RecorderCocoa {
+        KeyboardShortcuts.RecorderCocoa(for: name) { shortcut in
+            context.coordinator.onChange(shortcut)
+        }
+    }
+
+    func updateNSView(_ nsView: KeyboardShortcuts.RecorderCocoa, context: Context) {
+        nsView.shortcutName = name
+        context.coordinator.onChange = onChange
+    }
+
+    final class Coordinator {
+        var onChange: (KeyboardShortcuts.Shortcut?) -> Void
+
+        init(onChange: @escaping (KeyboardShortcuts.Shortcut?) -> Void) {
+            self.onChange = onChange
+        }
     }
 }

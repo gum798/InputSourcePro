@@ -228,6 +228,7 @@
 "Open Input Monitoring Settings" = "打开「输入监控」设置";
 "Open Input Monitoring Settings, click the \"+\" button and add \"Input Source Pro\" to the list." = "打开「输入监控」设置，点击“+”按钮并将“Input Source Pro”添加到列表中。";
 "Disabled until permissions are granted" = "权限授予前将被禁用";
+"Conflicts with the %@ shortcut" = "与%@快捷键设置冲突";
 
 "Settings Backup" = "设置备份";
 "Export Settings" = "导出设置";
