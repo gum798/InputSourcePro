@@ -258,13 +258,35 @@ extension IndicatorWindowController {
 // MARK: - Always near mouse
 
 extension IndicatorWindowController {
+    enum AlwaysNearMouse {
+        enum Placement: Equatable {
+            case hidden
+            case caret(CGPoint)
+            case mouse
+        }
+
+        /// Caret first: pin to a text caret when one was found, otherwise follow
+        /// the mouse. While scrolling the caret moves with the content, so hide
+        /// for that moment, as the always-on indicator does.
+        static func placement(isScrolling: Bool, position: PreferencesVM.IndicatorPositionInfo?) -> Placement {
+            if isScrolling {
+                return .hidden
+            }
+
+            guard let position = position, position.kind.isInputArea else { return .mouse }
+
+            return .caret(position.point)
+        }
+    }
+
     private static let mouseMoveEvents: NSEvent.EventTypeMask = [
         .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
     ]
 
     /// While "always display near mouse" is on, this pipeline owns the indicator:
-    /// it keeps it visible, moves it with the pointer, and refreshes its content
-    /// itself. The activate-event pipeline is idle in that mode.
+    /// it keeps it visible, pins it to the text caret when the always-on indicator
+    /// can find one and otherwise moves it with the pointer, and refreshes its
+    /// content itself. The activate-event pipeline is idle in that mode.
     func watchAlwaysNearMouse() {
         preferencesVM.$preferences
             .map(\.isAlwaysDisplayIndicatorNearMouseEnabled)
@@ -279,12 +301,12 @@ extension IndicatorWindowController {
     }
 
     private func alwaysNearMousePublisher() -> AnyPublisher<Void, Never> {
-        let isHiddenForApp = applicationVM.$appKind
-            .map { [weak self] appKind -> Bool in
-                guard let self = self, let appKind = appKind else { return false }
+        // Give the indicator content right away so it has a size to be placed with.
+        showNearMouseContent(inputSource: indicatorVM.state.inputSource, badge: nil)
 
-                return self.preferencesVM.isHideIndicator(appKind)
-            }
+        // Caret tracking needs the same preferences as the always-on indicator.
+        let caretTrackingPreferred = preferencesVM.$preferences
+            .map { $0.isEnhancedModeEnabled && $0.tryToDisplayIndicatorNearCursor && $0.isEnableAlwaysOnIndicator }
             .removeDuplicates()
 
         // The function-key badge shows for a second after a toggle, the same as
@@ -345,24 +367,95 @@ extension IndicatorWindowController {
             .mapToVoid()
             .eraseToAnyPublisher()
 
-        return isHiddenForApp
-            .flatMapLatest { [weak self] isHidden -> AnyPublisher<Void, Never> in
-                guard let self = self, !isHidden else {
-                    self?.isActive = false
+        return Publishers.CombineLatest(applicationVM.$appKind, caretTrackingPreferred)
+            .flatMapLatest { [weak self] appKind, caretTrackingPreferred -> AnyPublisher<Void, Never> in
+                guard let self = self else { return Empty().eraseToAnyPublisher() }
+
+                if let appKind = appKind, self.preferencesVM.isHideIndicator(appKind) {
+                    self.isActive = false
                     return Empty().eraseToAnyPublisher()
                 }
 
-                let contentShown = content
-                    .tap { self.showNearMouseContent(inputSource: $0.0, badge: $0.1) }
+                let placement: AnyPublisher<AlwaysNearMouse.Placement, Never>
+                if caretTrackingPreferred,
+                   let app = appKind?.getApp(),
+                   self.preferencesVM.isAbleToQueryLocation(app)
+                {
+                    placement = self.caretPlacementPublisher(app: app)
+                        .share(replay: 1)
+                        .eraseToAnyPublisher()
+                } else {
+                    placement = Just(.mouse).eraseToAnyPublisher()
+                }
+
+                // Re-apply the placement when the content or the Space changes, and
+                // whenever the placement itself changes.
+                let refresh = Publishers.Merge(
+                    content
+                        .tap { self.showNearMouseContent(inputSource: $0.0, badge: $0.1) }
+                        .mapToVoid()
+                        .eraseToAnyPublisher(),
+                    spaceChanged
+                )
+                .prepend(())
+
+                let applied = Publishers.CombineLatest(placement, refresh)
+                    .map { placement, _ in placement }
+                    .tap { self.apply(placement: $0) }
                     .mapToVoid()
                     .eraseToAnyPublisher()
 
-                return Publishers.MergeMany([contentShown, mouseMoved, mouseMovedDuringTracking, spaceChanged])
-                    .tap { self.moveNearMouse() }
+                // Pointer moves only matter while following the mouse.
+                let followed = Publishers.Merge(mouseMoved, mouseMovedDuringTracking)
+                    .withLatestFrom(placement)
+                    .filter { $0 == .mouse }
+                    .tap { _ in self.moveNearMouse() }
+                    .mapToVoid()
                     .eraseToAnyPublisher()
+
+                return Publishers.Merge(applied, followed).eraseToAnyPublisher()
             }
             .handleEvents(receiveCancel: { [weak self] in self?.isActive = false })
             .eraseToAnyPublisher()
+    }
+
+    /// Where the always-on indicator would put the indicator for this app, driven
+    /// by the same signals it uses (caret changes, a 1s poll, scrolling).
+    private func caretPlacementPublisher(app: NSRunningApplication) -> AnyPublisher<AlwaysNearMouse.Placement, Never> {
+        AlwaysOn.statePublisher(app: app)
+            .flatMapLatest { [weak self] changes -> AnyPublisher<AlwaysNearMouse.Placement, Never> in
+                guard let self = self, let appSize = self.getAppSize()
+                else { return Just(.mouse).eraseToAnyPublisher() }
+
+                if changes.current.isScrolling {
+                    return Just(.hidden).eraseToAnyPublisher()
+                }
+
+                return self.preferencesVM.getIndicatorPositionPublisher(appSize: appSize, app: app)
+                    .map { AlwaysNearMouse.placement(isScrolling: false, position: $0) }
+                    .eraseToAnyPublisher()
+            }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
+    private func apply(placement: AlwaysNearMouse.Placement) {
+        switch placement {
+        case .hidden:
+            isActive = false
+        case let .caret(point):
+            guard getAppSize() != nil else { return }
+
+            moveIndicator(position: (.inputCursor, point))
+            indicatorVC.showAlwaysOnView()
+
+            if !isActive {
+                isActive = true
+            }
+        case .mouse:
+            indicatorVC.showNormalView()
+            moveNearMouse()
+        }
     }
 
     private func showNearMouseContent(inputSource: InputSource, badge mode: FKeyMode?) {

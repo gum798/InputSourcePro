@@ -68,7 +68,7 @@
 "isEnableAlwaysOnIndicator" = "Display Always-On Indicator Near the Input Cursor";
 "alwaysOnIndicatorTips" = "This feature requires \"Display Near the Input Cursor if Available\" to be enabled.";
 "isAlwaysDisplayIndicatorNearMouse" = "Always Display Indicator Near the Mouse Cursor";
-"alwaysDisplayIndicatorNearMouseTips" = "The indicator stays visible and follows the mouse cursor. While this is on, the options under \"Advanced\" are not applied.";
+"alwaysDisplayIndicatorNearMouseTips" = "The indicator stays visible and follows the mouse cursor. With \"Display Always-On Indicator Near the Input Cursor\" enabled, it stays next to the input cursor while a text field is focused and follows the mouse otherwise.";
 "Customize Styles" = "Customize Styles";
 
 "Show" = "Show";

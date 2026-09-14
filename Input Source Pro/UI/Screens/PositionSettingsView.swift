@@ -49,8 +49,6 @@ struct PositionSettingsView: View {
             }
         )
 
-        let isAlwaysNearMouse = preferencesVM.preferences.isAlwaysDisplayIndicatorNearMouseEnabled
-
         ScrollView {
             VStack(spacing: 18) {
                 SettingsSection(title: "Position") {
@@ -149,7 +147,7 @@ struct PositionSettingsView: View {
                         HStack {
                             Toggle(isOn: $preferencesVM.preferences.tryToDisplayIndicatorNearCursor) {}
                                 .toggleStyle(.switch)
-                                .disabled(!preferencesVM.preferences.isEnhancedModeEnabled || isAlwaysNearMouse)
+                                .disabled(!preferencesVM.preferences.isEnhancedModeEnabled)
 
                             Text("tryToDisplayIndicatorNearCursor".i18n())
 
@@ -180,7 +178,7 @@ struct PositionSettingsView: View {
                         .border(width: 1, edges: [.bottom], color: NSColor.border2.color)
 
                         VStack {
-                            let needDisableAlwaysOnIndicator = !preferencesVM.preferences.isEnhancedModeEnabled || !preferencesVM.preferences.tryToDisplayIndicatorNearCursor || isAlwaysNearMouse
+                            let needDisableAlwaysOnIndicator = !preferencesVM.preferences.isEnhancedModeEnabled || !preferencesVM.preferences.tryToDisplayIndicatorNearCursor
 
                             HStack {
                                 Toggle("", isOn: $preferencesVM.preferences.isEnableAlwaysOnIndicator)

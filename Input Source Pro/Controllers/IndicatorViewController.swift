@@ -86,6 +86,11 @@ class IndicatorViewController: NSViewController {
         alwaysOnView?.animator().alphaValue = 1
     }
 
+    func showNormalView() {
+        normalView?.animator().alphaValue = 1
+        alwaysOnView?.animator().alphaValue = 0
+    }
+
     override func loadView() {
         view = hoverableView
     }

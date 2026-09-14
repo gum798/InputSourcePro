@@ -70,7 +70,7 @@
 "isEnableAlwaysOnIndicator" = "在輸入游標處顯示常駐提示";
 "alwaysOnIndicatorTips" = "開啟此功能需先啟用「優先在輸入游標附近顯示」";
 "isAlwaysDisplayIndicatorNearMouse" = "始終在滑鼠指標附近顯示提示";
-"alwaysDisplayIndicatorNearMouseTips" = "提示不會隱藏，並會跟隨滑鼠指標移動。開啟後，「進階設定」中的選項將不再生效。";
+"alwaysDisplayIndicatorNearMouseTips" = "提示不會隱藏，並會跟隨滑鼠指標移動。若已開啟「在輸入游標處顯示常駐提示」，在文字欄位取得焦點時提示會停留在輸入游標旁，其餘情況跟隨滑鼠。";
 "Customize Styles" = "自訂樣式";
 
 "Show" = "顯示";
