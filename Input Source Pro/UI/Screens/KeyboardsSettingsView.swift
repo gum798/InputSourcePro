@@ -360,7 +360,6 @@ private struct ShortcutControlsRow: View {
     let shortcutControlColumns: [GridItem]
 
     @State private var lastAcceptedKeyboardShortcut: KeyboardShortcuts.Shortcut?
-    @State private var lastAcceptedModifierCombo: ModifierCombo?
     @State private var conflictOwnerName: String?
 
     var body: some View {
@@ -419,8 +418,13 @@ private struct ShortcutControlsRow: View {
             }
         }
         .onAppear {
-            lastAcceptedKeyboardShortcut = KeyboardShortcuts.getShortcut(for: .init(recorderId))
-            lastAcceptedModifierCombo = modifierSelection
+            reloadAcceptedKeyboardShortcut()
+        }
+        .onReceive(preferencesVM.runtimeRuleChanges) { _ in
+            // Imports can replace shortcuts while this row remains on screen.
+            // The notification arrives after all imported shortcuts are saved.
+            reloadAcceptedKeyboardShortcut()
+            conflictOwnerName = nil
         }
         .onChange(of: mode) { _ in
             conflictOwnerName = nil
@@ -430,6 +434,10 @@ private struct ShortcutControlsRow: View {
                 trigger = .singlePress
             }
         }
+    }
+
+    private func reloadAcceptedKeyboardShortcut() {
+        lastAcceptedKeyboardShortcut = KeyboardShortcuts.getShortcut(for: .init(recorderId))
     }
 
     private var validatedModeBinding: Binding<ShortcutTriggerMode> {
@@ -488,7 +496,7 @@ private struct ShortcutControlsRow: View {
         let decision = ShortcutConflict.resolve(
             proposed: selection,
             currentId: recorderId,
-            lastAccepted: lastAcceptedModifierCombo,
+            lastAccepted: modifierSelection,
             assignments: ShortcutConflict.modifierAssignments(
                 preferencesVM: preferencesVM,
                 groups: groups
@@ -501,7 +509,6 @@ private struct ShortcutControlsRow: View {
         }
 
         conflictOwnerName = nil
-        lastAcceptedModifierCombo = decision.accepted
         onModifierSelect(decision.accepted)
     }
 }
