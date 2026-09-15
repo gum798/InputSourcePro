@@ -1,3 +1,4 @@
+import KeyboardShortcuts
 import XCTest
 @testable import Input_Source_Pro
 
@@ -167,5 +168,102 @@ final class ShortcutConflictTests: XCTestCase {
 
         XCTAssertEqual(result.accepted, rightCommand)
         XCTAssertEqual(result.conflictOwnerName, "ABC")
+    }
+
+    func testSwitchingBackToKeyboardModeRejectsAReusedShortcutBeforeApplyingChanges() {
+        let shortcut = KeyboardShortcuts.Shortcut(.a, modifiers: [.command, .shift])
+        let combo = ModifierCombo(keys: [.leftShift])
+        var mode = ShortcutTriggerMode.singleModifier
+        var savedCombo: ModifierCombo? = combo
+        var registrationCount = 0
+
+        let conflict = ShortcutConflict.updateMode(
+            .keyboardShortcut,
+            currentId: "abc",
+            keyboardShortcut: shortcut,
+            modifierCombo: savedCombo,
+            keyboardAssignments: [.init(id: "pinyin", displayName: "Pinyin", shortcut: shortcut)],
+            modifierAssignments: [],
+            apply: {
+                mode = $0
+                savedCombo = nil
+                registrationCount += 1
+            }
+        )
+
+        XCTAssertEqual(conflict, "Pinyin")
+        XCTAssertEqual(mode, .singleModifier)
+        XCTAssertEqual(savedCombo, combo)
+        XCTAssertEqual(registrationCount, 0)
+    }
+
+    func testModeChangeChecksTheFunctionKeysToggleForConflicts() {
+        let shortcut = KeyboardShortcuts.Shortcut(.f, modifiers: [.command, .shift])
+        let conflict = ShortcutConflict.updateMode(
+            .keyboardShortcut,
+            currentId: "switch-group",
+            keyboardShortcut: shortcut,
+            modifierCombo: nil,
+            keyboardAssignments: [.init(
+                id: PreferencesVM.functionKeysToggleShortcutId,
+                displayName: "Toggle Function Keys",
+                shortcut: shortcut
+            )],
+            modifierAssignments: [],
+            apply: { _ in XCTFail("A conflicting mode must not be applied") }
+        )
+
+        XCTAssertEqual(conflict, "Toggle Function Keys")
+    }
+
+    func testModeChangeAllowsAnEmptyOrSelfOwnedKeyboardShortcut() {
+        let shortcut = KeyboardShortcuts.Shortcut(.a, modifiers: [.command, .shift])
+        for savedShortcut in [nil, shortcut] {
+            var mode = ShortcutTriggerMode.singleModifier
+            let conflict = ShortcutConflict.updateMode(
+                .keyboardShortcut,
+                currentId: "abc",
+                keyboardShortcut: savedShortcut,
+                modifierCombo: nil,
+                keyboardAssignments: [.init(id: "abc", displayName: "ABC", shortcut: shortcut)],
+                modifierAssignments: [],
+                apply: { mode = $0 }
+            )
+
+            XCTAssertNil(conflict)
+            XCTAssertEqual(mode, .keyboardShortcut)
+        }
+    }
+
+    func testSwitchingToModifierModeIgnoresTheInactiveKeyboardShortcut() {
+        let shortcut = KeyboardShortcuts.Shortcut(.a, modifiers: [.command, .shift])
+        var mode = ShortcutTriggerMode.keyboardShortcut
+        let conflict = ShortcutConflict.updateMode(
+            .singleModifier,
+            currentId: "abc",
+            keyboardShortcut: shortcut,
+            modifierCombo: nil,
+            keyboardAssignments: [.init(id: "pinyin", displayName: "Pinyin", shortcut: shortcut)],
+            modifierAssignments: [],
+            apply: { mode = $0 }
+        )
+
+        XCTAssertNil(conflict)
+        XCTAssertEqual(mode, .singleModifier)
+    }
+
+    func testSwitchingToModifierModeRejectsARetainedConflictingCombo() {
+        let combo = ModifierCombo(keys: [.leftShift])
+        let conflict = ShortcutConflict.updateMode(
+            .singleModifier,
+            currentId: PreferencesVM.functionKeysToggleShortcutId,
+            keyboardShortcut: nil,
+            modifierCombo: combo,
+            keyboardAssignments: [],
+            modifierAssignments: [.init(id: "switch-group", displayName: "ABC / Pinyin", shortcut: combo)],
+            apply: { _ in XCTFail("A conflicting mode must not be applied") }
+        )
+
+        XCTAssertEqual(conflict, "ABC / Pinyin")
     }
 }

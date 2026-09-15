@@ -49,6 +49,34 @@ enum ShortcutConflict {
         String(format: "Conflicts with the %@ shortcut".i18n(), ownerName)
     }
 
+    /// Validate before applying the mode, which may clear the modifier combo and
+    /// register a previously inactive keyboard shortcut.
+    static func updateMode(
+        _ mode: ShortcutTriggerMode,
+        currentId: String,
+        keyboardShortcut: KeyboardShortcuts.Shortcut?,
+        modifierCombo: ModifierCombo?,
+        keyboardAssignments: [ShortcutAssignment<KeyboardShortcuts.Shortcut>],
+        modifierAssignments: [ShortcutAssignment<ModifierCombo>],
+        apply: (ShortcutTriggerMode) -> Void
+    ) -> String? {
+        let conflictOwnerName: String?
+        switch mode {
+        case .keyboardShortcut:
+            conflictOwnerName = keyboardShortcut.flatMap {
+                owner(of: $0, excluding: currentId, in: keyboardAssignments)?.displayName
+            }
+        case .singleModifier:
+            conflictOwnerName = modifierCombo.flatMap {
+                owner(of: $0, excluding: currentId, in: modifierAssignments)?.displayName
+            }
+        }
+
+        guard conflictOwnerName == nil else { return conflictOwnerName }
+        apply(mode)
+        return nil
+    }
+
     @MainActor
     static func keyboardAssignments(
         preferencesVM: PreferencesVM,

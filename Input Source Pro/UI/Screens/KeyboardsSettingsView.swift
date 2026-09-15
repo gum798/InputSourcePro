@@ -372,7 +372,7 @@ private struct ShortcutControlsRow: View {
         VStack(alignment: .trailing, spacing: 8) {
             LazyVGrid(columns: shortcutControlColumns, alignment: .trailing, spacing: 6) {
                 Text("Shortcut Type".i18n())
-                Picker("Shortcut Type".i18n(), selection: $mode) {
+                Picker("Shortcut Type".i18n(), selection: validatedModeBinding) {
                     ForEach(ShortcutTriggerMode.allCases) { option in
                         Text(option.name).tag(option)
                     }
@@ -430,6 +430,29 @@ private struct ShortcutControlsRow: View {
                 trigger = .singlePress
             }
         }
+    }
+
+    private var validatedModeBinding: Binding<ShortcutTriggerMode> {
+        Binding(
+            get: { mode },
+            set: { newMode in
+                conflictOwnerName = ShortcutConflict.updateMode(
+                    newMode,
+                    currentId: recorderId,
+                    keyboardShortcut: KeyboardShortcuts.getShortcut(for: .init(recorderId)),
+                    modifierCombo: modifierSelection,
+                    keyboardAssignments: ShortcutConflict.keyboardAssignments(
+                        preferencesVM: preferencesVM,
+                        groups: groups
+                    ),
+                    modifierAssignments: ShortcutConflict.modifierAssignments(
+                        preferencesVM: preferencesVM,
+                        groups: groups
+                    ),
+                    apply: { mode = $0 }
+                )
+            }
+        )
     }
 
     private func handleKeyboardShortcutChange(_ shortcut: KeyboardShortcuts.Shortcut?) {
