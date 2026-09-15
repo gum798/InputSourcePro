@@ -269,13 +269,41 @@ extension IndicatorWindowController {
         /// the mouse. While scrolling the caret moves with the content, so hide
         /// for that moment, as the always-on indicator does.
         static func placement(isScrolling: Bool, position: PreferencesVM.IndicatorPositionInfo?) -> Placement {
+            guard let position = position, position.kind.isInputArea else { return .mouse }
+
             if isScrolling {
                 return .hidden
             }
 
-            guard let position = position, position.kind.isInputArea else { return .mouse }
-
             return .caret(position.point)
+        }
+
+        static func placementPublisher(
+            isScrolling: AnyPublisher<Bool, Never>,
+            getPosition: @escaping () -> AnyPublisher<PreferencesVM.IndicatorPositionInfo?, Never>
+        ) -> AnyPublisher<Placement, Never> {
+            Deferred {
+                var lastPosition: PreferencesVM.IndicatorPositionInfo?
+
+                return isScrolling
+                    .flatMapLatest { isScrolling -> AnyPublisher<Placement, Never> in
+                        if isScrolling {
+                            // Hide a pinned caret immediately without querying moving
+                            // content. Mouse following stays active during scrolling.
+                            return Just(placement(isScrolling: true, position: lastPosition))
+                                .eraseToAnyPublisher()
+                        }
+
+                        return getPosition()
+                            .map { position in
+                                lastPosition = position
+                                return placement(isScrolling: false, position: position)
+                            }
+                            .eraseToAnyPublisher()
+                    }
+                    .removeDuplicates()
+            }
+            .eraseToAnyPublisher()
         }
     }
 
@@ -422,21 +450,16 @@ extension IndicatorWindowController {
     /// Where the always-on indicator would put the indicator for this app, driven
     /// by the same signals it uses (caret changes, a 1s poll, scrolling).
     private func caretPlacementPublisher(app: NSRunningApplication) -> AnyPublisher<AlwaysNearMouse.Placement, Never> {
-        AlwaysOn.statePublisher(app: app)
-            .flatMapLatest { [weak self] changes -> AnyPublisher<AlwaysNearMouse.Placement, Never> in
-                guard let self = self, let appSize = self.getAppSize()
-                else { return Just(.mouse).eraseToAnyPublisher() }
+        AlwaysNearMouse.placementPublisher(
+            isScrolling: AlwaysOn.statePublisher(app: app)
+                .map(\.current.isScrolling)
+                .eraseToAnyPublisher()
+        ) { [weak self] in
+            guard let self = self, let appSize = self.getAppSize()
+            else { return Just(nil).eraseToAnyPublisher() }
 
-                if changes.current.isScrolling {
-                    return Just(.hidden).eraseToAnyPublisher()
-                }
-
-                return self.preferencesVM.getIndicatorPositionPublisher(appSize: appSize, app: app)
-                    .map { AlwaysNearMouse.placement(isScrolling: false, position: $0) }
-                    .eraseToAnyPublisher()
-            }
-            .removeDuplicates()
-            .eraseToAnyPublisher()
+            return self.preferencesVM.getIndicatorPositionPublisher(appSize: appSize, app: app)
+        }
     }
 
     private func apply(placement: AlwaysNearMouse.Placement) {

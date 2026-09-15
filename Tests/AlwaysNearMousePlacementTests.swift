@@ -1,9 +1,10 @@
 import AppKit
+import Combine
 import XCTest
 @testable import Input_Source_Pro
 
 /// Verifies how the always-near-mouse mode decides where the indicator goes:
-/// hidden while scrolling, pinned to the text caret when one is found, and
+/// hidden while a caret scrolls, pinned to the text caret when one is found, and
 /// following the mouse otherwise.
 @MainActor
 final class AlwaysNearMousePlacementTests: XCTestCase {
@@ -11,7 +12,7 @@ final class AlwaysNearMousePlacementTests: XCTestCase {
 
     private let point = CGPoint(x: 10, y: 20)
 
-    func testScrollingHidesRegardlessOfPosition() {
+    func testScrollingHidesCaret() {
         XCTAssertEqual(
             IndicatorWindowController.AlwaysNearMouse.placement(isScrolling: true, position: (.inputCursor, point)),
             Placement.hidden
@@ -49,6 +50,98 @@ final class AlwaysNearMousePlacementTests: XCTestCase {
                 "\(kind) should follow the mouse"
             )
         }
+    }
+
+    func testScrollingWithoutCaretKeepsFollowingMouse() {
+        let positions: [PreferencesVM.IndicatorPositionInfo?] = [
+            nil, (.nearMouse, point), (.windowCorner, point),
+            (.screenCorner, point), (.floatingApp, point),
+        ]
+
+        for position in positions {
+            let scrolling = PassthroughSubject<Bool, Never>()
+            var placements: [Placement] = []
+            var queryCount = 0
+            let subscription = IndicatorWindowController.AlwaysNearMouse.placementPublisher(
+                isScrolling: scrolling.eraseToAnyPublisher()
+            ) {
+                queryCount += 1
+                return Just(position).eraseToAnyPublisher()
+            }
+            .sink { placements.append($0) }
+
+            scrolling.send(false)
+            scrolling.send(true)
+            scrolling.send(true)
+            XCTAssertEqual(placements, [.mouse])
+            XCTAssertEqual(queryCount, 1, "Scrolling must not add Accessibility queries")
+
+            scrolling.send(false)
+            XCTAssertEqual(placements, [.mouse])
+            XCTAssertEqual(queryCount, 2)
+            subscription.cancel()
+        }
+    }
+
+    func testCaretHidesImmediatelyWhileScrollingAndResolvesAgainAfterward() {
+        for kind in [IndicatorActuallyPositionKind.inputCursor, .inputRect] {
+            let scrolling = PassthroughSubject<Bool, Never>()
+            let position = PassthroughSubject<PreferencesVM.IndicatorPositionInfo?, Never>()
+            var placements: [Placement] = []
+            var queryCount = 0
+            let subscription = IndicatorWindowController.AlwaysNearMouse.placementPublisher(
+                isScrolling: scrolling.eraseToAnyPublisher()
+            ) {
+                queryCount += 1
+                return position.eraseToAnyPublisher()
+            }
+            .sink { placements.append($0) }
+
+            scrolling.send(false)
+            position.send((kind, point))
+            scrolling.send(true)
+            XCTAssertEqual(placements, [.caret(point), .hidden])
+            XCTAssertEqual(queryCount, 1)
+
+            // A query cancelled by scrolling cannot restore a stale caret.
+            position.send((kind, CGPoint(x: 30, y: 40)))
+            scrolling.send(true)
+            XCTAssertEqual(placements, [.caret(point), .hidden])
+
+            scrolling.send(false)
+            XCTAssertEqual(queryCount, 2)
+            let movedPoint = CGPoint(x: 50, y: 60)
+            position.send((kind, movedPoint))
+            XCTAssertEqual(placements, [.caret(point), .hidden, .caret(movedPoint)])
+
+            // Losing text focus must also clear the remembered caret placement.
+            scrolling.send(false)
+            position.send(nil)
+            scrolling.send(true)
+            XCTAssertEqual(placements, [.caret(point), .hidden, .caret(movedPoint), .mouse])
+            subscription.cancel()
+        }
+    }
+
+    func testScrollingBeforeFirstCaretResultKeepsMouseFallback() {
+        let scrolling = PassthroughSubject<Bool, Never>()
+        let position = PassthroughSubject<PreferencesVM.IndicatorPositionInfo?, Never>()
+        var placements: [Placement] = []
+        let subscription = IndicatorWindowController.AlwaysNearMouse.placementPublisher(
+            isScrolling: scrolling.eraseToAnyPublisher(),
+            getPosition: { position.eraseToAnyPublisher() }
+        )
+        .sink { placements.append($0) }
+
+        scrolling.send(false)
+        scrolling.send(true)
+        position.send((.inputCursor, point))
+        XCTAssertEqual(placements, [.mouse])
+
+        scrolling.send(false)
+        position.send((.inputCursor, point))
+        XCTAssertEqual(placements, [.mouse, .caret(point)])
+        subscription.cancel()
     }
 
     func testFunctionKeyBadgesRemainReadableAtCaretUntilExpiry() {
