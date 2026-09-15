@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Input_Source_Pro
 
@@ -47,6 +48,53 @@ final class AlwaysNearMousePlacementTests: XCTestCase {
                 Placement.mouse,
                 "\(kind) should follow the mouse"
             )
+        }
+    }
+
+    func testFunctionKeyBadgesRemainReadableAtCaretUntilExpiry() {
+        let controller = IndicatorViewController()
+        let inputSource = InputSource.getCurrentInputSource()
+
+        for mode in [FKeyMode.functionKeys, .mediaKeys] {
+            let config = IndicatorViewConfig(
+                inputSource: inputSource,
+                kind: .iconAndTitle,
+                size: .medium,
+                bgColor: .black,
+                textColor: .white
+            )
+
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+
+                controller.prepare(config: config)
+                controller.refresh()
+                controller.showAlwaysOnView()
+                XCTAssertEqual(controller.normalView?.alphaValue, 0)
+                XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
+
+                var badgeConfig = config
+                badgeConfig.badge = .init(glyph: mode.badgeGlyph, title: mode.displayName)
+                controller.prepare(config: badgeConfig)
+                controller.refresh()
+                controller.showAlwaysOnView()
+                XCTAssertEqual(controller.normalView?.alphaValue, 1)
+                XCTAssertEqual(controller.alwaysOnView?.alphaValue, 0)
+
+                // Caret updates during the one-second badge lifetime must not
+                // turn the function/media key feedback into an unlabelled dot.
+                controller.refresh()
+                controller.showAlwaysOnView()
+                XCTAssertEqual(controller.normalView?.alphaValue, 1)
+                XCTAssertEqual(controller.alwaysOnView?.alphaValue, 0)
+
+                // The badge timer restores the input-source config on expiry.
+                controller.prepare(config: config)
+                controller.refresh()
+                controller.showAlwaysOnView()
+                XCTAssertEqual(controller.normalView?.alphaValue, 0)
+                XCTAssertEqual(controller.alwaysOnView?.alphaValue, 1)
+            }
         }
     }
 }

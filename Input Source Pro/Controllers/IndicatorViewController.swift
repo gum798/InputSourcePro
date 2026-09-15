@@ -82,6 +82,13 @@ class IndicatorViewController: NSViewController {
     }
 
     func showAlwaysOnView() {
+        // Status badges need their glyph and title to communicate the new mode.
+        // Keep them readable until the badge expires, even while pinned to a caret.
+        guard config?.badge == nil else {
+            showNormalView()
+            return
+        }
+
         normalView?.animator().alphaValue = 0
         alwaysOnView?.animator().alphaValue = 1
     }
